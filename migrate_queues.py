@@ -63,6 +63,7 @@ def migrate_queue(queue_name):
             "arguments": features
         }
         create_response = requests.put(f"{rabbit_url}/api/queues/%2F/{name}", auth=auth, json=data)
+        printf(f"creating Quorum Queue {name} with {data}")
         if create_response.status_code == 201:
             print(f"Successfully created Quorum Queue: {name}")
         else:
@@ -74,6 +75,7 @@ def migrate_queue(queue_name):
             routing_key = binding['routing_key']
             bind_data = {"routing_key": routing_key, "arguments": binding.get('arguments', {})}
             bind_response = requests.post(f"{rabbit_url}/api/bindings/%2F/e/{source}/q/{name}", auth=auth, json=bind_data)
+            printf(f"Binding Quorum Queue {name} to {source} with {bind_data}")
             if bind_response.status_code == 201:
                 print(f"Successfully re-bound {name} to exchange {source} with routing key {routing_key}.")
             else:
@@ -83,7 +85,7 @@ def main():
     parser = argparse.ArgumentParser(description="Migrate RabbitMQ queues from Classic to Quorum.")
     parser.add_argument("--queues", nargs="*", help="Specific queues to migrate. If not specified, all queues will be migrated.")
     parser.add_argument("--backup", action="store_true", help="Backup RabbitMQ configuration before migrating.")
-    parser.add_argument("--dryrun", action="store_false", help="View only")
+    parser.add_argument("--dryrun", action="store_true", help="View only when argument is passed")
     args = parser.parse_args()
 
     global DRYRUN
