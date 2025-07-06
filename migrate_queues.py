@@ -7,6 +7,7 @@ from requests.auth import HTTPBasicAuth
 # Configuration
 rabbit_url = "http://localhost:15672"
 auth = HTTPBasicAuth(os.getenv('USERNAME'), os.getenv('PASSWD'))
+DRYRUN = False
 
 def backup_definitions():
     """Back up the current RabbitMQ configuration."""
