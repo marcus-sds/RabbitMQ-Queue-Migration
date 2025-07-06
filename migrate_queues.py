@@ -6,7 +6,7 @@ from requests.auth import HTTPBasicAuth
 
 # Configuration
 rabbit_url = "http://localhost:15672"
-auth = HTTPBasicAuth("username", "password")
+auth = HTTPBasicAuth(os.getenv('USERNAME'), os.getenv('PASSWD'))
 
 def backup_definitions():
     """Back up the current RabbitMQ configuration."""
@@ -48,40 +48,45 @@ def migrate_queue(queue_name):
             routing_key = binding.get('routing_key', 'No routing key')
             print(f"  - From Exchange: {exchange} with Routing Key: {routing_key}")
 
-    delete_response = requests.delete(f"{rabbit_url}/api/queues/%2F/{name}", auth=auth)
-    if delete_response.status_code == 204:
-        print(f"Successfully deleted the Classic Queue: {name}")
-    else:
-        print(f"Failed to delete the Classic Queue: {name}. Error: {delete_response.text}")
-        return
-
-    features['x-queue-type'] = 'quorum'
-    data = {
-        "durable": True,
-        "arguments": features
-    }
-    create_response = requests.put(f"{rabbit_url}/api/queues/%2F/{name}", auth=auth, json=data)
-    if create_response.status_code == 201:
-        print(f"Successfully created Quorum Queue: {name}")
-    else:
-        print(f"Failed to create Quorum Queue: {name}. Error: {create_response.text}")
-        return
-
-    for binding in bindings:
-        source = binding['source']
-        routing_key = binding['routing_key']
-        bind_data = {"routing_key": routing_key, "arguments": binding.get('arguments', {})}
-        bind_response = requests.post(f"{rabbit_url}/api/bindings/%2F/e/{source}/q/{name}", auth=auth, json=bind_data)
-        if bind_response.status_code == 201:
-            print(f"Successfully re-bound {name} to exchange {source} with routing key {routing_key}.")
+    if not DRYRUN:
+        delete_response = requests.delete(f"{rabbit_url}/api/queues/%2F/{name}", auth=auth)
+        if delete_response.status_code == 204:
+            print(f"Successfully deleted the Classic Queue: {name}")
         else:
-            print(f"Failed to re-bind {name} to exchange {source}. Error: {bind_response.text}")
+            print(f"Failed to delete the Classic Queue: {name}. Error: {delete_response.text}")
+            return
+    
+        features['x-queue-type'] = 'quorum'
+        data = {
+            "durable": True,
+            "arguments": features
+        }
+        create_response = requests.put(f"{rabbit_url}/api/queues/%2F/{name}", auth=auth, json=data)
+        if create_response.status_code == 201:
+            print(f"Successfully created Quorum Queue: {name}")
+        else:
+            print(f"Failed to create Quorum Queue: {name}. Error: {create_response.text}")
+            return
+    
+        for binding in bindings:
+            source = binding['source']
+            routing_key = binding['routing_key']
+            bind_data = {"routing_key": routing_key, "arguments": binding.get('arguments', {})}
+            bind_response = requests.post(f"{rabbit_url}/api/bindings/%2F/e/{source}/q/{name}", auth=auth, json=bind_data)
+            if bind_response.status_code == 201:
+                print(f"Successfully re-bound {name} to exchange {source} with routing key {routing_key}.")
+            else:
+                print(f"Failed to re-bind {name} to exchange {source}. Error: {bind_response.text}")
 
 def main():
     parser = argparse.ArgumentParser(description="Migrate RabbitMQ queues from Classic to Quorum.")
     parser.add_argument("--queues", nargs="*", help="Specific queues to migrate. If not specified, all queues will be migrated.")
     parser.add_argument("--backup", action="store_true", help="Backup RabbitMQ configuration before migrating.")
+    parser.add_argument("--dryrun", action="store_false", help="View only")
     args = parser.parse_args()
+
+    global DRYRUN
+    DRYUN = args('dryrun')
 
     if args.backup:
         backup_definitions()
