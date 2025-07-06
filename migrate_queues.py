@@ -86,7 +86,7 @@ def main():
     args = parser.parse_args()
 
     global DRYRUN
-    DRYUN = args('dryrun')
+    DRYUN = args.dryrun
 
     if args.backup:
         backup_definitions()
