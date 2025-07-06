@@ -34,9 +34,13 @@ def migrate_queue(queue_name):
     name = queue['name']
     vhost = queue['vhost']
     features = queue.get('arguments', {})
+    
     if features.get('x-max-priority'):
         del features['x-max-priority']
-        print(f"  - x-max-priority features removed from {name}")
+        print(f"  - x-max-priority removed from {name} features")
+    if features.get('x-queue-mode'):
+        del features['x-queue-mode']
+        print(f"  - x-queue-mode removed from {name} features")
     print(f"Migrating queue: {name} in vhost: {vhost} with features: {features}")
 
     all_bindings = requests.get(f"{rabbit_url}/api/bindings/%2F", auth=auth).json()
