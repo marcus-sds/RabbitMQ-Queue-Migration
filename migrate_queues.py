@@ -23,6 +23,26 @@ def backup_definitions():
         print(f"Failed to create backup. Error: {e}")
         exit(1)
 
+def get_vhosts():
+    arr_vhosts = []
+    dict_vhosts = {}
+    response = requests.get(f"{rabbit_url}/api/vhosts", auth=auth)
+    if response.status_code == 200:
+        vhosts = response.json()
+        for vhost in vhosts:
+            arr_vhosts.append(vhost['name'])
+            dict_vhosts[vhost['name']] = vhost
+    return arr_vhosts, dict_vhosts
+
+def put_vhosts_default_quorum(vhost_name, vhost):
+    if vhost_name == "/":
+        vhost_name = "%2F
+    else:
+        vhost_name = vhost_name.replace("/","")
+    vhost["default_queue_type"] = "quorum"
+    create_response = requests.put(f"{rabbit_url}/api/vhosts/{vhost_name}", auth=auth, json=data)
+    printf(f"updating default Queue to quorum with {vhost_name}")
+
 def migrate_queue(queue_name):
     """Migrate a single queue to a Quorum Queue."""
     response = requests.get(f"{rabbit_url}/api/queues/%2F/{queue_name}", auth=auth)
@@ -100,6 +120,7 @@ def main():
     global DRYRUN
     DRYUN = args.dryrun
 
+    arr_vhosts, dict_vhosts = get_vhosts()
     if args.backup:
         backup_definitions()
 
