@@ -34,7 +34,9 @@ def migrate_queue(queue_name):
     name = queue['name']
     vhost = queue['vhost']
     features = queue.get('arguments', {})
-    
+    if features.get('x-queue-type') == 'quorum':
+        print(f"  - skipping x-queue-type=quorum with {name} features")
+        return
     if features.get('x-max-priority'):
         del features['x-max-priority']
         print(f"  - x-max-priority removed from {name} features")
