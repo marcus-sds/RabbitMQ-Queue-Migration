@@ -33,21 +33,23 @@ def get_vhosts():
             arr_vhosts.append(vhost['name'])
             dict_vhosts[vhost['name']] = vhost
     return arr_vhosts, dict_vhosts
-
-def put_vhosts_default_quorum(vhost_name, vhost):
+def vhost_apireplace(vhost_name):
     if vhost_name == "/":
         vhost_name = "%2F
     else:
         vhost_name = vhost_name.replace("/","")
+    return vhost_name
+    
+def put_vhosts_default_quorum(vhost_name_api, vhost):
     vhost["default_queue_type"] = "quorum"
-    create_response = requests.put(f"{rabbit_url}/api/vhosts/{vhost_name}", auth=auth, json=data)
+    create_response = requests.put(f"{rabbit_url}/api/vhosts/{vhost_name_api}", auth=auth, json=vhost)
     printf(f"updating default Queue to quorum with {vhost_name}")
 
-def migrate_queue(queue_name):
+def migrate_queue(queue_name, vhost_name_api):
     """Migrate a single queue to a Quorum Queue."""
-    response = requests.get(f"{rabbit_url}/api/queues/%2F/{queue_name}", auth=auth)
+    response = requests.get(f"{rabbit_url}/api/queues/{vhost_name_api}/{queue_name}", auth=auth)
     if response.status_code != 200:
-        print(f"Queue {queue_name} does not exist or cannot be retrieved.")
+        print(f"{vhost_name_api} Queue {queue_name} does not exist or cannot be retrieved.")
         return
 
     queue = response.json()
@@ -63,7 +65,7 @@ def migrate_queue(queue_name):
     if features.get('x-queue-mode'):
         del features['x-queue-mode']
         print(f"  - x-queue-mode removed from {name} features")
-    print(f"Migrating queue: {name} in vhost: {vhost} with features: {features}")
+    print(f"{vhost_name_api} Migrating queue: {name} in vhost: {vhost} with features: {features}")
 
     all_bindings = requests.get(f"{rabbit_url}/api/bindings/%2F", auth=auth).json()
     bindings = [
@@ -128,14 +130,17 @@ def main():
         for queue in args.queues:
             migrate_queue(queue)
     else:
-        queues_response = requests.get(f"{rabbit_url}/api/queues/%2F", auth=auth)
-        if queues_response.status_code != 200:
-            print("Failed to retrieve queues.")
-            exit(1)
-
-        all_queues = queues_response.json()
-        for queue in all_queues:
-            migrate_queue(queue["name"])
+        for vhost_name in arr_vhosts:
+            put_vhosts_default_quorum(vhost_name, dict_vhosts[vhost_name])
+            vhost_name_api = vhost_apireplace(vhost_name)
+            queues_response = requests.get(f"{rabbit_url}/api/queues/{vhost_name_api}", auth=auth)
+            if queues_response.status_code != 200:
+                print("Failed to retrieve queues.")
+                exit(1)
+    
+            all_queues = queues_response.json()
+            for queue in all_queues:
+                migrate_queue(queue["name"], vhost_name_api)
 
 if __name__ == "__main__":
     main()
